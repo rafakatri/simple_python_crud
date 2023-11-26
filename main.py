@@ -8,34 +8,6 @@ from botocore.exceptions import ClientError, NoCredentialsError
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-async def get_secret():
-    secret_name = "app/mysql/credentials"
-    region_name = "us-east-1"
-
-    # Create a Secrets Manager client
-    session = boto3.session.Session()
-    client = session.client(
-        service_name='secretsmanager',
-        region_name=region_name
-    )
-
-    loop = asyncio.get_running_loop()
-
-    try:
-        # Unpack the dictionary into keyword arguments
-        get_secret_value_response = await loop.run_in_executor(
-            None,  # Uses the default executor
-            lambda: client.get_secret_value(SecretId=secret_name)
-        )
-    except ClientError as e:
-        raise e
-
-    # Decrypts secret using the associated KMS key.
-    secret = get_secret_value_response['SecretString']
-
-    return eval(secret)
-
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -46,8 +18,8 @@ try:
 except NoCredentialsError:
     logger.error("AWS credentials not found")
 
-LOG_GROUP = '/my-fastapi-app/logs'
-LOG_STREAM = os.getenv("INSTANCE_ID")
+LOG_GROUP = 'LogGroup'
+LOG_STREAM = 'LogStream'
 
 # Function to push logs to CloudWatch
 import asyncio
@@ -100,12 +72,11 @@ async def app_lifespan(app: FastAPI):
 app = FastAPI(lifespan=app_lifespan)
 
 async def create_connection():
-    secret = await get_secret()
     conn = await aiomysql.connect(
-        host=os.getenv("DB_HOST"),
-        user=secret["username"],
-        password=secret["password"],
-        db=secret["name"]
+        host=os.getenv("MD_DB_SERVER"),
+        user=os.getenv("MD_DB_USERNAME"),
+        password=os.getenv("MD_DB_PASSWORD"),
+        db= "mydb"
     )
     return conn
 
